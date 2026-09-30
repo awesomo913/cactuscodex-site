@@ -1,0 +1,119 @@
+// Gritty Mix — Random Events Engine
+
+const EVENT_ENGINE = {
+  lastEventDay: {},
+
+  // Check and trigger random events for a day
+  checkEvents() {
+    const collection = G.state.collection;
+    if (collection.length === 0) return;
+
+    // Give a new nursery a few quiet days. Events add decisions without interrupting every turn.
+    if (G.state.day < 4 || Math.random() > 0.24) return;
+
+    // Pick a random cactus
+    const cactus = collection[Math.floor(Math.random() * collection.length)];
+    const species = getSpecies(cactus.speciesId);
+    if (!species) return;
+    // `water` = days of hydration left (refilled to waterFreq on watering).
+    // Overwatering risk = watered too recently, i.e. reservoir still near full.
+    const wf = species.waterFreq || 10;
+    const poorWetMix = !!G.state.currentMix && SOIL.evaluateMix(cactus.speciesId, G.state.currentMix).score < 50;
+
+    // Already sick? Don't stack/overwrite an untreated affliction — treat it first.
+    if (cactus.affliction) return;
+
+    // Don't repeat the same event type per cactus too often
+    const eventRoll = Math.random();
+
+    let event = null;
+
+    if (eventRoll < 0.15 && cactus.health > 60) {
+      // Good events
+      const goodEvents = ['offset', 'bloom', 'nectaries'];
+      const type = goodEvents[Math.floor(Math.random() * goodEvents.length)];
+      event = EVENTS.find(e => e.id === type);
+      if (event) {
+        cactus.health = Math.min(100, cactus.health + 5);
+        if (type === 'offset') {
+          // Add a new offset as a separate cactus
+          const offset = COLLECTION.add(cactus.speciesId, {
+            stage: 'seedling',
+            growth: 0,
+            health: 50,
+            value: Math.round(cactus.value * 0.3)
+          });
+          if (offset) {
+            G.logEvent('good', event.icon, `${species.name} produced a pup! New cactus added.`);
+            return;
+          }
+        }
+      }
+    } else if (eventRoll < 0.40 && cactus.health > 40) {
+      // Bloom for flowering plants
+      if (cactus.stage === 'mature' || cactus.stage === 'blooming') {
+        event = EVENTS.find(e => e.id === 'bloom');
+        if (event) {
+          cactus.stage = 'blooming';
+          cactus.value = Math.round(cactus.value * 1.2);
+          G.state.coins += Math.floor(cactus.value * 0.1);
+        }
+      }
+    } else if (eventRoll < 0.70 && cactus.health > 30) {
+      // Bad events (pests etc) - higher chance on stressed plants.
+      // Overwatered plants are far more likely to get fungal rot (mirrors the guide).
+      let type;
+      if (poorWetMix && cactus.water > Math.max(1, wf - 3) && Math.random() < 0.5) {
+        type = 'fungal-rot';
+      } else {
+        const badEvents = ['spider-mites', 'mealybugs', 'scale', 'sunburn', 'fungus-gnats'];
+        type = badEvents[Math.floor(Math.random() * badEvents.length)];
+      }
+      event = EVENTS.find(e => e.id === type);
+      if (event) {
+        cactus.health = Math.max(0, cactus.health - 15);
+        // Leave a treatable affliction the player can fix in the inspect screen
+        if (typeof TREATMENTS !== 'undefined' && TREATMENTS[type]) cactus.affliction = type;
+      }
+    } else if (eventRoll < 0.85) {
+      // Info events
+      if (Math.random() < 0.5) {
+        event = EVENTS.find(e => e.id === 'corking');
+      }
+    } else {
+      // Root rot - serious, triggered by overwatering
+      if (poorWetMix && cactus.water > Math.max(1, wf - 2) && cactus.health > 20) {
+        event = EVENTS.find(e => e.id === 'root-rot');
+        if (event) {
+          cactus.health = Math.max(0, cactus.health - 30);
+          if (typeof TREATMENTS !== 'undefined' && TREATMENTS['root-rot']) cactus.affliction = 'root-rot';
+        }
+      }
+    }
+
+    if (event) {
+      const name = species.name;
+      G.logEvent(event.type, event.icon, `${name}: ${event.msg}`);
+    }
+  },
+
+  // Render event log
+  renderLog() {
+    const log = document.getElementById('event-log');
+    const events = G.state.lastEvents || [];
+
+    if (events.length === 0) {
+      log.innerHTML = '<div class="event-entry empty">No events yet. Start your day to see what happens!</div>';
+      return;
+    }
+
+    // Show last 20
+    const recent = events.slice(-20).reverse();
+    log.innerHTML = recent.map(e => `
+      <div class="event-entry ${e.type}">
+        <div class="time">Day ${e.day || '?'}</div>
+        <div class="msg">${e.text}</div>
+      </div>
+    `).join('');
+  }
+};

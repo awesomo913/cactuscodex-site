@@ -1,0 +1,332 @@
+// Gritty Mix — Breeding & Seedling System
+// Cross-pollinate cacti, harvest seeds, germinate in takeaway chambers
+
+const BREED = {
+  activeFruit: null, // {parentA, parentB, progress, maxDays}
+
+  // Initialize breeding UI
+  init() {
+    this.renderBreedSelects();
+    this.renderParentPreview();
+    document.getElementById('fruit-progress').style.display = this.activeFruit ? 'block' : 'none';
+    document.getElementById('seed-harvest').style.display = 'none';
+    document.getElementById('btn-pollinate').disabled = !!this.activeFruit;
+    if (this.activeFruit) this.updateFruitProgress();
+    this.renderSeedInventory();
+    this.renderGermChambers();
+    this.renderSowSelect();
+  },
+
+  // Populate parent selects with blooming cacti
+  renderBreedSelects() {
+    const a = document.getElementById('breed-parent-a');
+    const b = document.getElementById('breed-parent-b');
+    const bloomers = G.state.collection.filter(c => c.stage === 'blooming' && c.health > 0);
+
+    const opts = bloomers.map(c => {
+      const s = getSpecies(c.speciesId);
+      const name = s ? s.name : 'Unknown';
+      return `<option value="${c.instanceId}">${s?.emoji || '🌵'} ${name} (growth ${Math.round(c.growth)}·💰${c.value})</option>`;
+    }).join('');
+
+    const empty = '<option value="">— No blooming cacti —</option>';
+    a.innerHTML = bloomers.length ? '<option value="">— Select parent —</option>' + opts : empty;
+    b.innerHTML = bloomers.length ? '<option value="">— Select parent —</option>' + opts : empty;
+  },
+
+  plantThumb(speciesId, label = '') {
+    const species = getSpecies(speciesId);
+    if (typeof BOTANICAL === 'undefined' || !BOTANICAL.ready || !BOTANICAL.urls[speciesId]) {
+      return `<span class="plant-thumb is-loading">${label || species?.name || 'Plant'}</span>`;
+    }
+    return `<span class="plant-thumb"><img src="${BOTANICAL.urls[speciesId]}" alt=""><small>${label || species?.name || 'Plant'}</small></span>`;
+  },
+
+  renderParentPreview() {
+    const visual = document.getElementById('breed-visual');
+    if (!visual || !G.state) return;
+    const a = COLLECTION.get(+document.getElementById('breed-parent-a').value);
+    const b = COLLECTION.get(+document.getElementById('breed-parent-b').value);
+    const specimen = (plant, side) => plant
+      ? `<div class="breed-parent">${BOTANICAL.nursery(plant, 'market')}<span>${side}<b>${getSpecies(plant.speciesId)?.name || 'Cactus'}</b></span></div>`
+      : `<div class="breed-parent is-empty"><i></i><span>${side}<b>Choose a blooming plant</b></span></div>`;
+    visual.innerHTML = `${specimen(a, 'PARENT A')}<div class="pollen-path" aria-hidden="true"><i></i><span>pollen</span></div>${specimen(b, 'PARENT B')}`;
+  },
+
+  // Pollinate two cacti
+  pollinate() {
+    if (this.activeFruit) return;
+    const idA = parseInt(document.getElementById('breed-parent-a').value);
+    const idB = parseInt(document.getElementById('breed-parent-b').value);
+    const result = document.getElementById('breed-result');
+
+    if (!idA || !idB) {
+      result.innerHTML = '⚠️ Select two blooming cacti to cross-pollinate.';
+      return;
+    }
+    if (idA === idB) {
+      result.innerHTML = '⚠️ Select two different cacti. Self-pollination rarely works.';
+      return;
+    }
+
+    const parentA = COLLECTION.get(idA);
+    const parentB = COLLECTION.get(idB);
+    if (!parentA || !parentB || parentA.stage !== 'blooming' || parentB.stage !== 'blooming') {
+      result.innerHTML = '⚠️ Invalid selection.';
+      return;
+    }
+
+    const sA = getSpecies(parentA.speciesId);
+    const sB = getSpecies(parentB.speciesId);
+
+    result.innerHTML = `🌸 Pollinated! ${sA?.name || '?'} × ${sB?.name || '?'} — fruit is developing...`;
+    result.style.color = '#4a7c59';
+
+    // Start fruit ripening
+    this.activeFruit = {
+      parentA: parentA.speciesId,
+      parentB: parentB.speciesId,
+      progress: 0,
+      maxDays: 9 + Math.floor(Math.random() * 6)
+    };
+
+    document.getElementById('btn-pollinate').disabled = true;
+
+    document.getElementById('fruit-progress').style.display = 'block';
+    document.getElementById('seed-harvest').style.display = 'none';
+    this.updateFruitProgress();
+    G.logEvent('good', '🌸', `Cross-pollinated ${sA?.name} × ${sB?.name}! Fruit growing...`);
+    G.floatingText('🌸 Cross-pollinated!', document.getElementById('breed-section'));
+  },
+
+  // Called each day tick
+  dailyTick() {
+    if (!this.activeFruit) return;
+    this.activeFruit.progress++;
+    this.updateFruitProgress();
+  },
+
+  updateFruitProgress() {
+    const pct = Math.min(100, Math.round((this.activeFruit.progress / this.activeFruit.maxDays) * 100));
+    document.getElementById('fruit-bar').style.width = pct + '%';
+
+    let status = '';
+    if (pct < 20) status = '🌸 Flower wilting, ovary swelling...';
+    else if (pct < 40) status = '🍏 Green fruit growing...';
+    else if (pct < 60) status = '🍎 Fruit getting plumper...';
+    else if (pct < 80) status = '🍊 Fruit changing color...';
+    else if (pct < 100) status = '🍓 Almost ripe! A few more days...';
+    else {
+      status = '🍓 Fruit is ripe! Harvest your seeds!';
+      document.getElementById('seed-harvest').style.display = 'block';
+      document.getElementById('btn-pollinate').disabled = true;
+    }
+    document.getElementById('fruit-status').textContent = status;
+  },
+
+  // Harvest seeds from ripe fruit
+  harvest() {
+    if (!this.activeFruit || this.activeFruit.progress < this.activeFruit.maxDays) return;
+    const sA = getSpecies(this.activeFruit.parentA);
+    const sB = getSpecies(this.activeFruit.parentB);
+
+    // Generate seeds - quantity based on parents
+    const count = 5 + Math.floor(Math.random() * 15);
+    const hybridName = `${sA?.name || '?'} × ${sB?.name || '?'}`;
+
+    const seed = {
+      id: Date.now(),
+      name: hybridName,
+      parentA: this.activeFruit.parentA,
+      parentB: this.activeFruit.parentB,
+      count: count,
+      quality: 50 + Math.floor(Math.random() * 40),
+      harvested: G.state.day
+    };
+
+    if (!G.state.seeds) G.state.seeds = [];
+    G.state.seeds.push(seed);
+
+    document.getElementById('seed-harvest').style.display = 'none';
+    document.getElementById('fruit-progress').style.display = 'none';
+    document.getElementById('btn-pollinate').disabled = false;
+    document.getElementById('breed-result').innerHTML = `🍓 Harvested ${count} seeds from ${hybridName}! 🌰`;
+    document.getElementById('breed-result').style.color = '#4a7c59';
+
+    this.activeFruit = null;
+    this.renderSeedInventory();
+    this.renderSowSelect();
+    G.logEvent('good', '🍓', `Harvested ${count} seeds from ${hybridName}!`);
+    G.floatingText('🍓 ' + count + ' seeds!', document.getElementById('seed-inv-section'));
+  },
+
+  // Render seed inventory
+  renderSeedInventory() {
+    const inv = document.getElementById('seed-inventory');
+    const seeds = G.state.seeds || [];
+
+    if (seeds.length === 0) {
+      inv.innerHTML = '<p style="color:var(--muted);font-size:13px">No seeds yet. Cross-pollinate blooming cacti to get some.</p>';
+      return;
+    }
+
+    inv.innerHTML = seeds.map(s => {
+      const speciesInfo = getSpecies(s.parentA);
+      const speciesName = speciesInfo ? speciesInfo.name : '';
+      return `
+        <div class="seed-entry">
+          <div class="seed-parents">${this.plantThumb(s.parentA)}${s.parentB && s.parentB !== s.parentA ? this.plantThumb(s.parentB) : ''}</div>
+          <div class="seed-copy">
+            <div class="seed-line">
+              <span class="seed-name">${s.name}</span>
+              <span class="seed-count">×${s.count}</span>
+            </div>
+            ${speciesName ? `<div class="seed-origin">${speciesName}${s.parentB && s.parentB !== s.parentA ? ` × ${getSpecies(s.parentB)?.name || 'hybrid'}` : ''}</div>` : ''}
+            <div class="seed-quality"><span><i style="width:${s.quality}%"></i></span><b>${s.quality}% quality</b></div>
+            ${s.germination ? `<div class="seed-note">${s.germination}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  // Render sow select dropdown
+  renderSowSelect() {
+    const sel = document.getElementById('sow-select');
+    const seeds = G.state.seeds || [];
+    if (seeds.length === 0) {
+      sel.innerHTML = '<option value="">— No seeds available —</option>';
+      return;
+    }
+    sel.innerHTML = '<option value="">— Select seed —</option>' +
+      seeds.map((s, i) => `<option value="${i}">🌰 ${s.name} (×${s.count})</option>`).join('');
+  },
+
+  // Sow seeds in germination chamber
+  sow() {
+    const idx = parseInt(document.getElementById('sow-select').value);
+    const seeds = G.state.seeds || [];
+
+    if (isNaN(idx) || !seeds[idx]) {
+      document.getElementById('breed-result').innerHTML = '⚠️ Select seeds to sow.';
+      document.getElementById('breed-result').style.color = '#9e4340';
+      return;
+    }
+
+    const seed = seeds[idx];
+    if (seed.count < 1) {
+      document.getElementById('breed-result').innerHTML = '⚠️ Need at least one seed to sow.';
+      return;
+    }
+
+    // Create a germination chamber
+    const chamber = {
+      id: Date.now(),
+      seedName: seed.name,
+      parentA: seed.parentA,
+      parentB: seed.parentB,
+      seedsUsed: Math.min(5, seed.count),
+      day: 0,
+      maxDays: 4 + Math.floor(Math.random() * 4),
+      stage: 'sown', // sown -> germinating -> seedling -> ready
+      quality: seed.quality
+    };
+
+    if (!G.state.chambers) G.state.chambers = [];
+    G.state.chambers.push(chamber);
+
+    seed.count -= chamber.seedsUsed;
+    if (seed.count <= 0) {
+      G.state.seeds.splice(idx, 1);
+    }
+
+    this.renderSeedInventory();
+    this.renderSowSelect();
+    this.renderGermChambers();
+    G.logEvent('good', '🌱', `Sowed ${chamber.seedName} seeds in germination chamber!`);
+    G.floatingText('🌱 Seeds sown!', document.getElementById('germ-section'));
+  },
+
+  // Tick germination chambers
+  tickChambers() {
+    const chambers = G.state.chambers || [];
+    chambers.forEach(ch => {
+      if (ch.stage === 'ready') return;
+      ch.day++;
+
+      if (ch.day >= ch.maxDays && ch.stage === 'sown') {
+        ch.stage = 'germinating';
+        G.logEvent('good', '🌱', `Germination! ${ch.seedName} seeds are sprouting!`);
+      } else if (ch.day >= ch.maxDays + 5 && ch.stage === 'germinating') {
+        ch.stage = 'seedling';
+        G.logEvent('good', '🌿', `${ch.seedName} seedlings are growing!`);
+      } else if (ch.day >= ch.maxDays + 13 && ch.stage === 'seedling') {
+        ch.stage = 'ready';
+        G.logEvent('good', '🌿', `${ch.seedName} seedlings ready to pot up!`);
+        G.floatingText('🌿 Ready to pot!', document.getElementById('germ-section'));
+      }
+    });
+    this.renderGermChambers();
+  },
+
+  // Pot up a ready chamber into individual cacti
+  potUp(chamberId) {
+    const chambers = G.state.chambers || [];
+    const idx = chambers.findIndex(c => c.id === chamberId);
+    if (idx === -1) return;
+
+    const ch = chambers[idx];
+    if (ch.stage !== 'ready') return;
+
+    // Create new cactus from the seedlings
+    // Pick one of the parent species (or hybrid)
+    const parentSpecies = Math.random() < 0.5 ? ch.parentA : ch.parentB;
+    const seedlings = Math.max(1, Math.round(ch.seedsUsed * ch.quality / 100));
+
+    for (let i = 0; i < seedlings; i++) {
+      const variation = Math.floor(Math.random() * 10) - 5; // -5 to +5
+      COLLECTION.add(parentSpecies, {
+        stage: 'seedling',
+        growth: Math.max(1, 2 + variation),
+        health: 75 + Math.floor(Math.random() * 20),
+        value: 5 + Math.floor(Math.random() * 10)
+      });
+    }
+
+    G.state.chambers.splice(idx, 1);
+    this.renderGermChambers();
+    G.logEvent('good', '🪴', `Potted up ${seedlings} seedlings from ${ch.seedName}!`);
+    G.floatingText('🪴 ' + seedlings + ' potted!', document.getElementById('nursery-grid'));
+  },
+
+  // Render germination chambers
+  renderGermChambers() {
+    const container = document.getElementById('germ-chambers');
+    const chambers = G.state.chambers || [];
+
+    if (chambers.length === 0) {
+      container.innerHTML = '<p style="color:var(--muted);font-size:13px">No active germination chambers.</p>';
+      return;
+    }
+
+    container.innerHTML = chambers.map(ch => {
+      const pct = Math.min(100, Math.round((ch.day / (ch.maxDays + 13)) * 100));
+      const stageName = ch.stage === 'sown' ? 'Sown' : ch.stage === 'germinating' ? 'Germinating' : ch.stage === 'seedling' ? 'Growing' : 'Ready!';
+      const reveal = ch.stage === 'sown' ? .08 : ch.stage === 'germinating' ? .3 : ch.stage === 'seedling' ? .62 : 1;
+      const visual = ch.stage === 'sown' ? [26,.55,.22] : ch.stage === 'germinating' ? [18,.68,.46] : ch.stage === 'seedling' ? [8,.82,.72] : [0,1,1];
+
+      return `
+        <div class="germ-chamber">
+          <div class="chamber-visual" style="--reveal:${reveal};--seed-y:${visual[0]}px;--seed-scale:${visual[1]};--seed-opacity:${visual[2]}">${this.plantThumb(ch.parentA, stageName)}<i></i></div>
+          <div class="germ-header">
+            <span class="germ-name">${ch.seedName}</span>
+            <span class="germ-stage">${stageName}</span>
+          </div>
+          <div class="sim-progress"><div class="bar" style="width:${pct}%"></div></div>
+          <div class="germ-info">Day ${ch.day} · Quality: ${ch.quality}%</div>
+          ${ch.stage === 'ready' ? `<button onclick="BREED.potUp(${ch.id})" class="btn-secondary" style="margin-top:4px">🪴 Pot Up</button>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+};
