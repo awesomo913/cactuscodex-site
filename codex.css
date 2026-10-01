@@ -53,7 +53,11 @@ html{scroll-padding-top:105px}body{background:var(--bg);font-family:var(--font);
 .codex-cover-copy{align-self:stretch;display:flex;flex-direction:column;padding-bottom:0}
 .codex-cover .codex-kicker{margin-top:auto}
 .codex-cover .cover-description{margin-bottom:clamp(16px,2.8vh,28px)}
-.codex-cover .cover-actions{margin-top:auto;margin-bottom:0}
+.codex-cover .cover-actions{margin-top:28px;margin-bottom:0;align-items:flex-end}
+/* Text sits on the buttons; both buttons share one bottom edge with the photo (Jacob 2026-10-01) */
+.codex-cover h1{line-height:.74}
+.codex-cover .cover-actions>a{height:52px;min-height:52px;box-sizing:border-box;margin:0}
+.codex-cover .cover-actions .codex-game-entry{box-shadow:inset 0 -3px 0 #9a773f}
 }
 /* Header picks (Jacob 2026-10-01): nav on a shared baseline, roomier strip, quiet external link, title without period */
 @media (min-width:801px){
