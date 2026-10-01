@@ -48,9 +48,10 @@ html{scroll-padding-top:105px}body{background:var(--bg);font-family:var(--font);
 .codex-cover figure{height:clamp(150px,30svh,300px)}
 }
 @media (max-width:350px){.codex-cover .cover-actions{flex-wrap:wrap}}
-/* Hero photo ends level with the buttons (Jacob 2026-10-01) */
+/* Hero keeps the full first-screen height; the text column stretches so the buttons end level with the photo (Jacob 2026-10-01) */
 @media (min-width:541px){
-.codex-cover{height:auto;min-height:0;max-height:none}
-.codex-cover-copy{padding-bottom:0;align-self:end}
-.codex-cover .cover-actions{margin-bottom:0}
+.codex-cover-copy{align-self:stretch;display:flex;flex-direction:column;padding-bottom:0}
+.codex-cover .codex-kicker{margin-top:auto}
+.codex-cover .cover-description{margin-bottom:clamp(16px,2.8vh,28px)}
+.codex-cover .cover-actions{margin-top:auto;margin-bottom:0}
 }
