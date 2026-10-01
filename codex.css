@@ -55,3 +55,11 @@ html{scroll-padding-top:105px}body{background:var(--bg);font-family:var(--font);
 .codex-cover .cover-description{margin-bottom:clamp(16px,2.8vh,28px)}
 .codex-cover .cover-actions{margin-top:auto;margin-bottom:0}
 }
+/* Header picks (Jacob 2026-10-01): nav on a shared baseline, roomier strip, quiet external link, title without period */
+@media (min-width:801px){
+.codex-nav{align-items:baseline;padding-top:31px}
+.codex-nav-links a[href^="https://revolutionarydesigns.io"]{color:#9fae95;padding-left:30px;border-left:1px solid #3a4b3b}
+.codex-nav-links a[href^="https://revolutionarydesigns.io"]::after{content:"\2197";font-size:.85em;margin-left:4px;opacity:.8}
+}
+@media (min-width:541px){.codex-context{padding-top:44px;padding-bottom:44px}}
+.codex-cover h1{letter-spacing:-.01em}
