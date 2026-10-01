@@ -23,3 +23,9 @@
 .guide-download a{display:inline-flex;align-items:center;min-height:44px;font-size:.78rem;color:#40573c;text-decoration:underline;text-underline-offset:4px}
 @media(max-width:760px){.research-evidence-table caption{display:block;width:100%;padding:0 0 16px;line-height:1.7}}
 @media(max-width:760px){.codex-index .codex-research-hub{padding:48px 6%}.research-evidence-table thead{display:none}.codex-paper .research-evidence-table,.research-evidence-table tbody,.research-evidence-table tr,.research-evidence-table th,.research-evidence-table td{display:block;width:100%}.research-evidence-table tr{border:1px solid #d5cdb9;border-radius:8px;padding:14px;margin:0 0 14px;background:#f3f0e5}.codex-paper .research-evidence-table th{font-size:1.2rem;background:transparent;border:0;padding:0 0 10px}.codex-paper .research-evidence-table td{font-size:.85rem;border:0;padding:0 0 10px}.research-evidence-table td::before{content:attr(data-label);display:block;font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:#59644e;margin-bottom:6px}}
+
+/* Quick facts box on species/genus pages (2026-09-30) */
+.codex-paper table.facts{width:100%;table-layout:auto;border-collapse:collapse;margin:.4rem 0 1.4rem;font-size:.86rem}
+.codex-paper table.facts th{width:34%;text-align:left;vertical-align:top;font-weight:600;color:var(--green,#365239);padding:.45rem .7rem;border-bottom:1px solid #d6c8ac;background:rgba(214,200,172,.18)}
+.codex-paper table.facts td{vertical-align:top;padding:.45rem .7rem;border-bottom:1px solid #d6c8ac}
+@media(max-width:600px){.codex-paper table.facts th{width:40%}.codex-paper table.facts{font-size:.8rem}}
